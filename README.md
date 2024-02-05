@@ -1,6 +1,6 @@
 # Send VPC Flow logs to Splunk via Kinesis Firehose
 
-This module configures a Kinesis Firehose, sets up a subscription for a desired CloudWatch Log Group to the Firehose, and sends the log data to Splunk. A Lambda function is required to transform the VPC Log data to a format compatible with Splunk. This module takes care of configuring this Lambda function.
+This module configures Kinesis Firehose, sets up a subscription for a desired CloudWatch Log Group to the Firehose, and sends the log data to Splunk. A Lambda function is required to transform the VPC Log data to a format compatible with Splunk. This module takes care of configuring this Lambda function.
 
 The Lambda function used is the one provided for AWS by Splunk: https://github.com/splunk/splunk-aws-firehose-flowlogs-processor
 

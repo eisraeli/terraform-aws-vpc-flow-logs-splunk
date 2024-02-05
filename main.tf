@@ -6,15 +6,15 @@ resource "aws_flow_log" "vpc" {
   max_aggregation_interval = var.flow_log_max_aggregation_interval
 }
 
-# endpoint type is set to Raw since we're using the Splunk provider lambda to send data.
+# Endpoint type is set to Raw since we're using the Splunk provider lambda to send data.
 # See https://aws.amazon.com/blogs/big-data/ingest-vpc-flow-logs-into-splunk-using-amazon-kinesis-data-firehose/
 resource "aws_kinesis_firehose_delivery_stream" "vpc_logs_to_splunk" {
-  name        = "${var.vpc_name}-vpc-logs-to-splunk"
+  name        = "${var.vpc_id}-vpc-logs-to-splunk"
   destination = "splunk"
 
   splunk_configuration {
     hec_endpoint               = var.splunk_endpoint
-    hec_token                  = module.hec_token_kms_secret.hec_token_kms_secret
+    hec_token                  = var.hec_token
     hec_acknowledgment_timeout = var.hec_acknowledgment_timeout
     hec_endpoint_type          = "Raw"
     retry_duration             = var.firehose_splunk_retry_duration
@@ -66,7 +66,7 @@ resource "aws_kinesis_firehose_delivery_stream" "vpc_logs_to_splunk" {
 
   tags = merge(
     {
-      Name               = "${var.vpc_name}-vpc-logs-to-splunk"
+      Name               = "${var.vpc_id}-vpc-logs-to-splunk"
       LogDeliveryEnabled = "true"
     },
     var.tags,
@@ -74,9 +74,9 @@ resource "aws_kinesis_firehose_delivery_stream" "vpc_logs_to_splunk" {
 }
 
 resource "aws_s3_bucket" "kinesis_firehose" {
-  bucket = "${var.vpc_name}-flow-logs"
+  bucket = "${var.vpc_id}-flow-logs"
   tags = merge(
-    { Name = "${var.vpc_name}-flow-logs" },
+    { Name = "${var.vpc_id}-flow-logs" },
     var.tags,
   )
 }
@@ -95,18 +95,12 @@ resource "aws_s3_bucket_acl" "kinesis_firehose" {
   depends_on = [aws_s3_bucket_ownership_controls.kinesis_firehose]
 }
 
-module "hec_token_kms_secret" {
-  source    = "disney/kinesis-firehose-splunk/aws//modules/kms_secrets"
-  hec_token = var.hec_token
-  version   = "8.1.0" # this cannot be set in a variable, see https://github.com/hashicorp/terraform/issues/28912
-}
-
 resource "aws_cloudwatch_log_group" "kinesis" {
-  name              = "/aws/kinesisfirehose/${var.vpc_name}-vpc-logs-to-splunk"
+  name              = "/aws/kinesisfirehose/${var.vpc_id}-vpc-logs-to-splunk"
   retention_in_days = var.cloudwatch_log_retention
 
   tags = merge(
-    { managed_by_integration = "app-sre/infra" },
+    { managed_by_integration = "konflux/infra" },
     var.tags
   )
 }
@@ -117,7 +111,7 @@ resource "aws_cloudwatch_log_stream" "kinesis" {
 }
 
 resource "aws_iam_role" "vpc_flow_logs_to_splunk_kinesis_firehose_lambda" {
-  name        = "${var.vpc_name}-vpc-flow-logs-to-splunk-kinesis-firehose-lambda"
+  name        = "${var.vpc_id}-vpc-flow-logs-to-splunk-firehose-lambda"
   description = "Role for Lambda function to transform VPC Flow Logs into Splunk compatible format"
 
   assume_role_policy = jsonencode({
@@ -134,7 +128,7 @@ resource "aws_iam_role" "vpc_flow_logs_to_splunk_kinesis_firehose_lambda" {
   })
 
   inline_policy {
-    name = "${var.vpc_name}-vpc-flow-logs-to-splunk-kinesis-firehose-lambda"
+    name = "${var.vpc_id}-vpc-flow-logs-to-splunk-firehose-lambda"
 
     policy = jsonencode({
       Version = "2012-10-17"
@@ -153,7 +147,7 @@ resource "aws_iam_role" "vpc_flow_logs_to_splunk_kinesis_firehose_lambda" {
   }
 
   tags = merge(
-    { Name = "${var.vpc_name}-vpc-flow-logs-to-splunk-kinesis-firehose-lambda" },
+    { Name = "${var.vpc_id}-vpc-flow-logs-to-splunk-firehose-lambda" },
     var.tags,
   )
 }
@@ -193,8 +187,8 @@ resource "aws_lambda_function" "splunk_firehose_flowlogs_processor" {
 }
 
 resource "aws_iam_role" "kinesis_firehose" {
-  name        = "${var.vpc_name}-vpc-flow-logs-to-splunk-kinesis-firehose"
-  description = "IAM Role for Kinesis Firehose to send ${var.vpc_name} vpc flow logs to splunk"
+  name        = "${var.vpc_id}-vpc-flow-logs-to-splunk-kinesis-firehose"
+  description = "IAM Role for Kinesis Firehose to send ${var.vpc_id} vpc flow logs to splunk"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -210,7 +204,7 @@ resource "aws_iam_role" "kinesis_firehose" {
   })
 
   inline_policy {
-    name = "${var.vpc_name}-vpc-flow-logs-to-splunk-kinesis-firehose"
+    name = "${var.vpc_id}-vpc-flow-logs-to-splunk-kinesis-firehose"
 
     policy = jsonencode({
       Version = "2012-10-17"
@@ -245,7 +239,7 @@ resource "aws_iam_role" "kinesis_firehose" {
   }
 
   tags = merge(
-    { Name = "${var.vpc_name}-vpc-flow-logs-to-splunk-kinesis-firehose" },
+    { Name = "${var.vpc_id}-vpc-flow-logs-to-splunk-kinesis-firehose" },
     var.tags,
   )
 }
